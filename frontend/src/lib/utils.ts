@@ -31,3 +31,15 @@ export function truncate(str: string, maxLen: number): string {
 export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
+
+/**
+ * Safely ensure a value is an array.
+ * Returns empty array if value is null, undefined, or not an array.
+ * Prevents ".map is not a function" errors.
+ */
+export function safeArray<T>(value: T[] | null | undefined | unknown): T[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return [];
+}

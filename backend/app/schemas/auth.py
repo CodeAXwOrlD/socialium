@@ -39,5 +39,20 @@ class UserResponse(BaseModel):
     subscription_tier: str
     is_active: bool
     created_at: datetime
+    phone_number: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class GoogleAuthRequest(BaseModel):
+    code: str
+    code_verifier: str
+
+
+class PhoneOTPRequest(BaseModel):
+    phone_number: str
+
+
+class PhoneOTPVerifyRequest(BaseModel):
+    phone_number: str
+    otp: str

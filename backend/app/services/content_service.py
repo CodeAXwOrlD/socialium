@@ -186,6 +186,47 @@ _EMOJI_RE = re.compile(
     flags=re.UNICODE,
 )
 
+# Control characters that break JSON parsing (except \t, \n, \r)
+_INVALID_JSON_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+def _safe_json_parse(raw: str) -> dict[str, Any]:
+    """Parse JSON from LLM response, sanitizing control characters first.
+
+    LLMs occasionally emit unescaped control characters (e.g., \x00-\x1f)
+    inside JSON string values, which breaks json.loads. This function
+    strips those characters before parsing, and falls back gracefully.
+    """
+    # Strip control characters that JSON doesn't allow
+    sanitized = _INVALID_JSON_CONTROL_RE.sub("", raw)
+    # Try to find the first { and last } in case the model added extra text
+    start = sanitized.find("{")
+    end = sanitized.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        sanitized = sanitized[start:end + 1]
+    try:
+        result = json.loads(sanitized)
+        # Handle double-encoded JSON (common with Groq): body contains full JSON
+        body = result.get("body", "")
+        if isinstance(body, str) and body.strip().startswith("{"):
+            try:
+                inner = json.loads(body)
+                if "body" in inner and "title" in inner:
+                    result = {**result, **inner}
+            except json.JSONDecodeError:
+                pass
+        return result
+    except json.JSONDecodeError:
+        logger.warning(f"JSON parse failed even after sanitization, raw: {raw[:200]}")
+        # Last resort: extract body from raw text
+        body = raw
+        for tag in ("\"body\"", "'body'"):
+            body_match = re.search(rf'{tag}\\s*:\\s*"(.+?)"', raw, re.DOTALL)
+            if body_match:
+                body = body_match.group(1)
+                break
+        return {"body": body, "hashtags": [], "title": ""}
+
 
 def _strip_emojis(text: str) -> str:
     """Remove all emojis from text."""
@@ -245,11 +286,87 @@ async def generate_content(
     trending_keywords: list[str] | None = None,
     content_length: str = "medium",
     creativity: int = 50,
+    generate_variants: bool = False,
 ) -> dict[str, Any]:
     """Generate platform-optimized social media content using AI.
 
     Enriched with brand memory, trend data, and platform-specific rules.
+    If generate_variants is True, returns multiple variants for A/B testing.
     """
+    
+    # If A/B testing is enabled, generate 3 variants
+    if generate_variants:
+        variants = []
+        for i in range(3):
+            # Slightly vary temperature for each variant
+            variant_temp = creativity_to_temperature(creativity) + (i * 0.1 - 0.1)
+            variant_temp = max(0.3, min(1.0, variant_temp))  # Clamp between 0.3 and 1.0
+            
+            variant = await _generate_single_content(
+                platform=platform,
+                tone=tone,
+                topic=topic,
+                keywords=keywords,
+                max_length=max_length,
+                include_hashtags=include_hashtags,
+                include_mentions=include_mentions,
+                brand_voice=brand_voice,
+                target_audience=target_audience,
+                include_emojis=include_emojis,
+                temperature=variant_temp,
+                workspace_id=workspace_id,
+                trending_keywords=trending_keywords,
+                content_length=content_length,
+                creativity=creativity,
+            )
+            variant["variant_id"] = f"variant_{i+1}"
+            variants.append(variant)
+        
+        return {
+            "variants": variants,
+            "is_ab_test": True,
+            "num_variants": len(variants),
+        }
+    else:
+        result = await _generate_single_content(
+            platform=platform,
+            tone=tone,
+            topic=topic,
+            keywords=keywords,
+            max_length=max_length,
+            include_hashtags=include_hashtags,
+            include_mentions=include_mentions,
+            brand_voice=brand_voice,
+            target_audience=target_audience,
+            include_emojis=include_emojis,
+            temperature=temperature,
+            workspace_id=workspace_id,
+            trending_keywords=trending_keywords,
+            content_length=content_length,
+            creativity=creativity,
+        )
+        result["is_ab_test"] = False
+        return result
+
+
+async def _generate_single_content(
+    platform: Platform,
+    tone: ContentTone,
+    topic: str | None = None,
+    keywords: list[str] | None = None,
+    max_length: int = 500,
+    include_hashtags: bool = True,
+    include_mentions: bool = False,
+    brand_voice: str | None = None,
+    target_audience: str | None = None,
+    include_emojis: bool = True,
+    temperature: float = 0.8,
+    workspace_id: str | None = None,
+    trending_keywords: list[str] | None = None,
+    content_length: str = "medium",
+    creativity: int = 50,
+) -> dict[str, Any]:
+    """Generate a single piece of content (internal helper)."""
 
     # ── Step 1: Build enriched context ──
     effective_brand_voice = brand_voice
@@ -338,7 +455,7 @@ async def generate_content(
         )
 
         content = response.choices[0].message.content
-        result = json.loads(content or "{}")
+        result = _safe_json_parse(content or "{}")
 
         body = result.get("body", "")
         hashtags = result.get("hashtags", [])
@@ -392,7 +509,7 @@ async def _generate_with_groq(
     )
 
     content = response.choices[0].message.content
-    result = json.loads(content or "{}")
+    result = _safe_json_parse(content or "{}")
 
     body = result.get("body", "")
     hashtags = result.get("hashtags", [])

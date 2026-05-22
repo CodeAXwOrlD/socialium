@@ -1,5 +1,6 @@
 """OAuth state management using Redis for secure CSRF protection."""
 
+import asyncio
 import json
 import secrets
 import time
@@ -13,13 +14,22 @@ settings = get_settings()
 OAUTH_STATE_TTL = 600  # 10 minutes
 
 
-async def _get_redis() -> aioredis.Redis:
-    """Get an async Redis connection."""
-    return aioredis.from_url(settings.redis_url, decode_responses=True)
+# In-memory fallback for development when Redis is missing
+_memory_store: dict[str, str] = {}
+
+async def _get_redis() -> aioredis.Redis | None:
+    """Get an async Redis connection. Returns None if connection fails."""
+    try:
+        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        # Test connection
+        await asyncio.wait_for(r.ping(), timeout=1.0)
+        return r
+    except Exception:
+        return None
 
 
 async def generate_oauth_state(platform: str, user_id: str, redirect_path: str = "/platforms") -> str:
-    """Generate a cryptographically random OAuth state and store it in Redis."""
+    """Generate a cryptographically random OAuth state and store it in Redis (or memory)."""
     state = secrets.token_urlsafe(32)
     payload = {
         "platform": platform,
@@ -27,20 +37,33 @@ async def generate_oauth_state(platform: str, user_id: str, redirect_path: str =
         "redirect_path": redirect_path,
         "created_at": time.time(),
     }
+    
     r = await _get_redis()
-    await r.setex(f"oauth_state:{state}", OAUTH_STATE_TTL, json.dumps(payload))
+    if r:
+        await r.setex(f"oauth_state:{state}", OAUTH_STATE_TTL, json.dumps(payload))
+    else:
+        # Fallback to memory
+        _memory_store[f"oauth_state:{state}"] = json.dumps(payload)
+    
     return state
 
 
 async def validate_oauth_state(state: str) -> dict | None:
-    """Validate an OAuth state from Redis, returning the stored payload if valid."""
-    r = await _get_redis()
+    """Validate an OAuth state, returning the stored payload if valid."""
     key = f"oauth_state:{state}"
-    data = await r.get(key)
+    r = await _get_redis()
+    
+    if r:
+        data = await r.get(key)
+        if data:
+            await r.delete(key)
+    else:
+        # Fallback to memory
+        data = _memory_store.pop(key, None)
+        
     if data is None:
         return None
-    # Delete after single use
-    await r.delete(key)
+        
     try:
         return json.loads(data)
     except json.JSONDecodeError:

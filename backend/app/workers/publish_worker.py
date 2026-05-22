@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.database import async_session_factory
 from app.models.content import Content
 from app.core.constants import ContentStatus
+from app.services.publishing_service import PublishingService
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -15,6 +16,8 @@ settings = get_settings()
 
 async def publish_scheduled_content() -> None:
     """Publish all content that is scheduled and due."""
+    publisher = PublishingService()
+    
     try:
         async with async_session_factory() as db:
             from sqlalchemy import select
@@ -30,18 +33,29 @@ async def publish_scheduled_content() -> None:
 
             for content in contents:
                 try:
-                    content.status = ContentStatus.PUBLISHED
-                    content.published_at = datetime.now(timezone.utc)
-                    await db.commit()
-                    logger.info(f"Published content {content.id}")
+                    # Actually publish to platform
+                    publish_result = await publisher.publish_content(content, db)
+                    
+                    if publish_result.get("success"):
+                        content.status = ContentStatus.PUBLISHED
+                        content.published_at = datetime.now(timezone.utc)
+                        # Store platform post ID for analytics tracking
+                        content.ai_model_used = publish_result.get("platform_post_id", "")
+                        await db.commit()
+                        logger.info(f"Published content {content.id} to {content.platform.value}: {publish_result.get('platform_url')}")
+                    else:
+                        content.status = ContentStatus.FAILED
+                        await db.commit()
+                        logger.error(f"Failed to publish content {content.id}: {publish_result.get('error')}")
+                        
                 except Exception as e:
                     await db.rollback()
-                    logger.error(f"Failed to publish content {content.id}: {e}")
                     content.status = ContentStatus.FAILED
                     await db.commit()
+                    logger.error(f"Publish error for {content.id}: {e}", exc_info=True)
 
     except Exception as e:
-        logger.error(f"Publish worker failed: {e}")
+        logger.error(f"Publish worker failed: {e}", exc_info=True)
 
 
 async def refresh_trends() -> None:

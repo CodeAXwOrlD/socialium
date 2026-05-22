@@ -72,7 +72,7 @@ TIER_LIMITS: dict[SubscriptionTier, dict[str, int]] = {
         "max_team_members": 1,
         "max_platforms": 2,
         "max_scheduled_posts": 10,
-        "ai_generations_per_day": 5,
+        "ai_generations_per_day": 100,  # Increased from 5 for development
         "analytics_history_days": 7,
         "ab_testing_enabled": False,
     },

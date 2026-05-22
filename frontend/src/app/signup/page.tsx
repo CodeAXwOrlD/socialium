@@ -20,15 +20,41 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      console.log('Attempting signup with:', email, username);
       const res = await signUp({ email, password, username, full_name: fullName || undefined });
+      console.log('Signup successful:', res);
+      
+      console.log('Saving tokens...');
+      console.log('Access token type:', typeof res.access_token);
+      console.log('Access token length:', res.access_token?.length);
+      
       setTokens(res.access_token, res.refresh_token);
+      
+      // Verify tokens were saved
+      const savedToken = localStorage.getItem('access_token');
+      console.log('Token saved to localStorage:', !!savedToken);
+      console.log('Saved token matches:', savedToken === res.access_token);
+      
       if (res.user) {
         setStoredUser(res.user);
+        console.log('User saved:', res.user.email);
       }
-      toast.success("Account created!");
+      
+      toast.success("Account created! Welcome to Socialium!");
+      console.log('Redirecting to dashboard...');
+      
+      // Small delay to ensure localStorage is committed
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
       router.push("/dashboard");
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || "Signup failed");
+      console.error('Signup error:', err);
+      console.error('Error response:', err?.response);
+      console.error('Error data:', err?.response?.data);
+      console.error('Error status:', err?.response?.status);
+      const errorMessage = err?.response?.data?.detail || err?.message || "Signup failed. Please try again.";
+      console.error('Showing error:', errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,7 @@ import logging
 import httpx
 
 from app.config import get_settings
+from app.services.twilio_service import twilio_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -14,9 +15,16 @@ async def send_whatsapp_message(
     phone_number: str,
     message: str,
 ) -> bool:
-    """Send a WhatsApp message via WapiHub API."""
+    """Send a WhatsApp message via WapiHub or Twilio."""
+    # 1. Try Twilio if configured
+    if settings.twilio_account_sid and settings.twilio_whatsapp_number:
+        result = await twilio_service.send_whatsapp(phone_number, message)
+        if result:
+            return True
+
+    # 2. Try WapiHub as fallback or primary if Twilio not set
     if not settings.wapihub_api_key:
-        logger.warning("WapiHub API key not configured, skipping WhatsApp message")
+        logger.warning("No messaging provider configured (Twilio/WapiHub)")
         return False
 
     url = f"{settings.wapihub_url}/messages"
@@ -25,6 +33,8 @@ async def send_whatsapp_message(
         "phone": phone_number,
         "message": message,
     }
+    if settings.wapihub_phone_number_id:
+        payload["phone_number_id"] = settings.wapihub_phone_number_id
 
     headers = {
         "Authorization": f"Bearer {settings.wapihub_api_key}",
@@ -38,7 +48,16 @@ async def send_whatsapp_message(
                 logger.info(f"WhatsApp message sent to {phone_number}")
                 return True
             else:
-                logger.error(f"WapiHub error: {response.status_code} - {response.text}")
+                error_body = response.text[:300]
+                logger.error(f"WapiHub error: {response.status_code} - {error_body}")
+                # Log full message for debugging in dev mode
+                if settings.app_env == "development":
+                    print(f"\n{'='*60}")
+                    print(f"WHATSAPP MESSAGE (dev mode - WapiHub delivery failed)")
+                    print(f"To: {phone_number}")
+                    print(f"Error: {response.status_code} - {error_body}")
+                    print(f"Message:\n{message}")
+                    print(f"{'='*60}\n")
                 return False
     except Exception as e:
         logger.error(f"WhatsApp send failed: {e}")

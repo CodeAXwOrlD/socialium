@@ -178,15 +178,44 @@ export interface PlatformAccount {
 
 /* ===== Analytics ===== */
 
-export interface AnalyticsOverview {
+export interface AnalyticsSummary {
   total_posts: number;
-  total_engagement: number;
+  total_impressions: number;
   total_likes: number;
   total_comments: number;
   total_shares: number;
-  avg_quality_score: number;
-  posts_by_platform: Record<Platform, number>;
-  posts_by_status: Record<ContentStatus, number>;
+  total_clicks: number;
+  average_engagement_rate: number;
+}
+
+export interface PlatformBreakdown {
+  platform: string;
+  posts: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  engagement_rate: number;
+}
+
+export interface TimeSeriesPoint {
+  date: string;
+  value: number;
+  label?: string;
+}
+
+export interface AnalyticsOverview {
+  summary: AnalyticsSummary;
+  platform_breakdown: PlatformBreakdown[];
+  time_series: TimeSeriesPoint[];
+  top_posts: Array<{
+    id: string;
+    title: string | null;
+    platform: string | null;
+    likes: number;
+    comments: number;
+    shares: number;
+    created_at: string | null;
+  }>;
 }
 
 /* ===== Notification ===== */

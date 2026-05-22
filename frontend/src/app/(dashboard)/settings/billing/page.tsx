@@ -59,8 +59,8 @@ export default function BillingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Billing & Plans</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>Billing & Plans</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
           You&apos;re currently on the <span className="font-medium capitalize">{currentTier}</span> plan
         </p>
       </div>
@@ -73,8 +73,8 @@ export default function BillingPage() {
               key={plan.id}
               className={`relative rounded-xl border p-6 ${
                 plan.popular
-                  ? "border-brand-300 bg-brand-50/30 shadow-sm"
-                  : "border-gray-200 bg-white"
+                  ? "border-brand-300 bg-brand-50/30 dark:border-brand-700 dark:bg-brand-900/20 shadow-sm"
+                  : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
               }`}
             >
               {plan.popular && (
@@ -83,16 +83,16 @@ export default function BillingPage() {
                 </span>
               )}
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
+                <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>{plan.name}</h3>
                 <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-gray-900">{plan.price}</span>
-                  <span className="text-sm text-gray-500">{plan.period}</span>
+                  <span className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>{plan.price}</span>
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{plan.period}</span>
                 </div>
               </div>
 
               <ul className="mb-6 space-y-2.5">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-2 text-sm text-gray-600">
+                  <li key={feature} className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
                     <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
                     {feature}
                   </li>
@@ -103,10 +103,10 @@ export default function BillingPage() {
                 disabled={isCurrent}
                 className={`w-full rounded-lg py-2.5 text-sm font-semibold transition-colors ${
                   isCurrent
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    ? "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed"
                     : plan.popular
                     ? "bg-brand-600 text-white hover:bg-brand-700"
-                    : "border border-gray-200 text-gray-700 hover:bg-gray-50"
+                    : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 }`}
               >
                 {isCurrent ? "Current Plan" : "Upgrade"}
@@ -117,11 +117,11 @@ export default function BillingPage() {
       </div>
 
       {/* Payment method */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Payment Method</h2>
-        <div className="flex items-center gap-3 rounded-lg border border-gray-100 p-4">
-          <CreditCard className="h-5 w-5 text-gray-400" />
-          <p className="text-sm text-gray-600">
+      <div className="rounded-xl border p-6" style={{ background: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+        <h2 className="font-semibold mb-4" style={{ color: "var(--text-primary)" }}>Payment Method</h2>
+        <div className="flex items-center gap-3 rounded-lg border p-4" style={{ borderColor: "var(--border-color)" }}>
+          <CreditCard className="h-5 w-5" style={{ color: "var(--text-muted)" }} />
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             No payment method on file.{" "}
             <button className="font-medium text-brand-600 hover:text-brand-700">
               Add one

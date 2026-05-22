@@ -128,3 +128,22 @@ async def supabase_refresh_token(refresh_token: str) -> dict | None:
         if response.status_code == 200:
             return response.json()
         return None
+
+
+async def supabase_exchange_code_for_token(code: str, code_verifier: str) -> dict | None:
+    """Exchange OAuth code for Supabase tokens (Google, etc.)."""
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{settings.supabase_url}/auth/v1/token?grant_type=pkce",
+            headers={
+                "apikey": settings.supabase_anon_key,
+                "Content-Type": "application/json",
+            },
+            json={
+                "auth_code": code,
+                "code_verifier": code_verifier,
+            },
+        )
+        if response.status_code == 200:
+            return response.json()
+        return None

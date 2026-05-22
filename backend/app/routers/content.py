@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from datetime import datetime, timezone
 
 import openai
 from fastapi import APIRouter, Depends, HTTPException
@@ -26,17 +27,22 @@ from app.services.whatsapp_notification_service import (
 )
 from app.core.constants import ContentStatus, ApprovalAction
 from app.core.rate_limiter import check_generation_limit, increment_generation_count
+from app.core.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.post("/", response_model=ContentResponse, status_code=201)
-async def create_content(body: ContentCreate, db: AsyncSession = Depends(get_db)):
+async def create_content(
+    body: ContentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Create a new content draft."""
     content = Content(
         workspace_id=body.workspace_id,
-        author_id=uuid.uuid4(),  # TODO: get from auth
+        author_id=current_user.id,
         platform=body.platform,
         tone=body.tone,
         title=body.title,
@@ -56,37 +62,55 @@ async def create_content(body: ContentCreate, db: AsyncSession = Depends(get_db)
 @router.get("/", response_model=list[ContentResponse])
 async def list_content(
     workspace_id: uuid.UUID | None = None,
-    status: str | None = None,
+    status_filter: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List content with optional filters."""
-    query = select(Content)
+    query = select(Content).where(Content.author_id == current_user.id)
     if workspace_id:
         query = query.where(Content.workspace_id == workspace_id)
-    if status:
-        query = query.where(Content.status == status)
+    if status_filter:
+        query = query.where(Content.status == status_filter)
     query = query.order_by(Content.created_at.desc())
     result = await db.execute(query)
     return result.scalars().all()
 
 
 @router.get("/{content_id}", response_model=ContentResponse)
-async def get_content(content_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_content(
+    content_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get content by ID."""
     content = await db.get(Content, content_id)
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
+    
+    # Verify ownership
+    if content.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this content")
+    
     return content
 
 
 @router.patch("/{content_id}", response_model=ContentResponse)
 async def update_content(
-    content_id: uuid.UUID, body: ContentUpdate, db: AsyncSession = Depends(get_db)
+    content_id: uuid.UUID,
+    body: ContentUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Update content."""
     content = await db.get(Content, content_id)
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
+    
+    # Verify ownership
+    if content.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this content")
+    
     update_data = body.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(content, key, value)
@@ -96,11 +120,20 @@ async def update_content(
 
 
 @router.delete("/{content_id}", status_code=204)
-async def delete_content(content_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete_content(
+    content_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Delete content."""
     content = await db.get(Content, content_id)
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
+    
+    # Verify ownership
+    if content.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this content")
+    
     await db.delete(content)
     await db.commit()
 
@@ -243,6 +276,27 @@ async def approve_content(
         raise HTTPException(status_code=400, detail="Invalid action")
 
     content.status = new_status
+    
+    # If approved, auto-schedule using AI analytics
+    if body.action == "approve" and not content.scheduled_at:
+        try:
+            from app.services.ai_scheduler_service import suggest_optimal_time
+            
+            # Get AI-suggested optimal posting time
+            optimal_time = await suggest_optimal_time(
+                workspace_id=str(content.workspace_id),
+                platform=content.platform.value if content.platform else "linkedin",
+            )
+            
+            if optimal_time:
+                content.scheduled_at = optimal_time
+                logger.info(f"Content {content_id} auto-scheduled for {optimal_time}")
+        except Exception as e:
+            logger.warning(f"Failed to auto-schedule content: {e}")
+            # Fallback: schedule for 1 hour from now
+            from datetime import datetime, timedelta
+            content.scheduled_at = datetime.utcnow() + timedelta(hours=1)
+    
     await db.commit()
 
     # Send WhatsApp confirmation if user has phone number
@@ -257,7 +311,17 @@ async def approve_content(
     except Exception as e:
         logger.warning(f"Failed to send approval result notification: {e}")
 
-    return {"status": "ok", "content_status": new_status.value}
+    response = {
+        "status": "ok",
+        "content_status": new_status.value,
+    }
+    
+    # Include scheduled time if content was approved
+    if body.action == "approve" and content.scheduled_at:
+        response["scheduled_at"] = content.scheduled_at.isoformat()
+        response["ai_scheduled"] = True
+    
+    return response
 
 
 @router.post("/{content_id}/submit-for-approval")
@@ -282,6 +346,8 @@ async def submit_for_approval(
 
     # Lookup author phone number
     author = await db.get(User, content.author_id)
+    logger.info(f"Submitting content {content_id} - Author: {author.id if author else 'None'}, Phone: {author.phone_number if author else 'None'}")
+    
     if not author or not author.phone_number:
         logger.warning(f"No phone number for author {content.author_id}, cannot send WhatsApp")
         return {
@@ -299,11 +365,14 @@ async def submit_for_approval(
         title=content.title,
     )
 
-    return {
+    response = {
         "status": "pending_approval",
         "whatsapp_sent": sent,
         "content_id": str(content.id),
     }
+    if not sent:
+        response["reason"] = "WhatsApp delivery failed. Check WapiHub configuration (phone_number_id must be valid)."
+    return response
 
 
 @router.post("/{content_id}/score")
@@ -347,3 +416,65 @@ async def viral_score_content(content_id: uuid.UUID, db: AsyncSession = Depends(
     except Exception as e:
         logger.error(f"Viral scoring failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Viral scoring failed: {str(e)}")
+
+
+@router.post("/{content_id}/publish-now")
+async def publish_content_now(
+    content_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Immediately publish content to LinkedIn (bypass scheduling)."""
+    content = await db.get(Content, content_id)
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+    
+    # Verify ownership
+    if content.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to publish this content")
+    
+    # Check if content is in a publishable state
+    if content.status not in [ContentStatus.APPROVED, ContentStatus.SCHEDULED, ContentStatus.DRAFT]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Content must be approved or scheduled before publishing. Current status: {content.status.value}"
+        )
+    
+    try:
+        from app.services.publishing_service import PublishingService
+        
+        publisher = PublishingService()
+        
+        # Publish to LinkedIn
+        publish_result = await publisher.publish_to_linkedin(content, db)
+        
+        if publish_result.get("success"):
+            # Update content status
+            content.status = ContentStatus.PUBLISHED
+            content.published_at = datetime.now(timezone.utc)
+            content.ai_model_used = publish_result.get("platform_post_id", "")
+            await db.commit()
+            
+            logger.info(f"Manually published content {content_id} to LinkedIn: {publish_result.get('platform_url')}")
+            
+            return {
+                "success": True,
+                "message": "Content published to LinkedIn successfully!",
+                "platform_post_id": publish_result.get("platform_post_id"),
+                "platform_url": publish_result.get("platform_url"),
+                "published_at": content.published_at.isoformat(),
+            }
+        else:
+            error_msg = publish_result.get("error", "Unknown error")
+            logger.error(f"Failed to publish content {content_id}: {error_msg}")
+            
+            return {
+                "success": False,
+                "message": "Failed to publish to LinkedIn",
+                "error": error_msg,
+                "troubleshooting": "Check that your LinkedIn account is connected and the OAuth token is valid."
+            }
+            
+    except Exception as e:
+        logger.error(f"Publish now failed for {content_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Publish failed: {str(e)}")

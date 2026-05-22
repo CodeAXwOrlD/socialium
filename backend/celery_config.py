@@ -23,7 +23,12 @@ def start_scheduler() -> None:
     jobstores = {}
     if settings.redis_url:
         try:
-            jobstores["default"] = RedisJobStore(url=settings.redis_url)
+            from redis import Redis
+            jobstores["default"] = RedisJobStore(
+                host=settings.redis_url.split("://")[1].split(":")[0],
+                port=int(settings.redis_url.split(":")[2].split("/")[0]),
+                db=int(settings.redis_url.split("/")[-1]) if "/" in settings.redis_url.split("://")[1] else 0
+            )
             logger.info("Using Redis job store for scheduler")
         except Exception as e:
             logger.warning(f"Redis job store setup failed, using memory: {e}")
@@ -53,6 +58,8 @@ def start_scheduler() -> None:
         minutes=1,
         id="publish_scheduled",
         executor="publish",
+        replace_existing=True,  # Replace job if it already exists (prevents conflicts on restart)
+        max_instances=1,
     )
 
     _scheduler.add_job(
@@ -61,6 +68,8 @@ def start_scheduler() -> None:
         hours=6,
         id="refresh_trends",
         executor="default",
+        replace_existing=True,
+        max_instances=1,
     )
 
     _scheduler.add_job(
@@ -69,6 +78,18 @@ def start_scheduler() -> None:
         hours=24,
         id="detect_churn_and_reengage",
         executor="default",
+        replace_existing=True,
+        max_instances=1,
+    )
+
+    _scheduler.add_job(
+        _analytics_wrapper,
+        "interval",
+        hours=6,
+        id="collect_engagement_analytics",
+        executor="default",
+        replace_existing=True,
+        max_instances=1,
     )
 
     _scheduler.start()
@@ -100,3 +121,9 @@ async def _churn_wrapper() -> None:
     """Wrapper for churn detection."""
     from app.workers.publish_worker import churn_detection
     await churn_detection()
+
+
+async def _analytics_wrapper() -> None:
+    """Wrapper for analytics collection."""
+    from app.workers.analytics_worker import collect_engagement_analytics
+    await collect_engagement_analytics()

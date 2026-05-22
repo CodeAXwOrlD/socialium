@@ -9,7 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.langfuse_setup import langfuse_health_check, langfuse_flush
+from app.core.logging_setup import setup_logging
 from app.core.qdrant_client import create_all_collections
+from app.core.sentry_setup import setup_sentry
+from app.middleware.request_id import RequestIDMiddleware
 from app.routers import (
     ab_testing,
     analytics,
@@ -25,6 +28,8 @@ from app.routers import (
     scheduling,
     trends,
     whatsapp_webhook,
+    twilio_webhook,
+    platform_webhooks,
     workspace,
 )
 from app.services import (
@@ -40,6 +45,13 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan - startup and shutdown events."""
+    
+    # Initialize Sentry FIRST (before any other initialization)
+    setup_sentry()
+    
+    # Configure structured logging
+    setup_logging(settings.app_env)
+    
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
 
     # ── Qdrant collection setup ──
@@ -83,11 +95,20 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:3000"],
+    allow_origins=[
+        settings.frontend_url, 
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Request ID middleware (must be added AFTER CORS)
+app.add_middleware(RequestIDMiddleware)
 
 # Exception handlers
 register_exception_handlers(app)
@@ -109,6 +130,8 @@ app.include_router(trends.router, prefix=f"{api_prefix}/trends", tags=["Trends"]
 app.include_router(ab_testing.router, prefix=f"{api_prefix}/ab-testing", tags=["A/B Testing"])
 app.include_router(auto_reply.router, prefix=f"{api_prefix}/auto-reply", tags=["Auto Reply"])
 app.include_router(whatsapp_webhook.router, prefix=f"{api_prefix}/whatsapp", tags=["WhatsApp"])
+app.include_router(twilio_webhook.router, prefix=f"{api_prefix}/twilio", tags=["Twilio"])
+app.include_router(platform_webhooks.router, prefix=f"{api_prefix}/platforms", tags=["Platform Webhooks"])
 
 
 @app.get("/health")

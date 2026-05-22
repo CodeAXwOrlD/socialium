@@ -19,6 +19,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     username: Mapped[str | None] = mapped_column(String(100), unique=True)
     full_name: Mapped[str | None] = mapped_column(String(200))
+    phone_number: Mapped[str | None] = mapped_column(String(20), index=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500))
     subscription_tier: Mapped[SubscriptionTier] = mapped_column(
         Enum(SubscriptionTier), default=SubscriptionTier.FREE

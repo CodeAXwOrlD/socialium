@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.content import Content
+from app.models.user import User
 from app.core.constants import ContentStatus
+from app.core.auth import get_current_user
 from app.services.audience_activity_service import get_optimal_posting_times, AudienceActivityService
 from app.services.viral_scoring_service import score_viral_potential, ViralScoringService
 from app.services.ai_scheduler_service import auto_schedule_content, bulk_auto_schedule_content
@@ -31,11 +33,17 @@ class BulkScheduleRequest(BaseModel):
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
 @router.get("/")
-async def list_scheduled(db: AsyncSession = Depends(get_db)):
-    """List all scheduled content."""
+async def list_scheduled(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all scheduled content for current user."""
     result = await db.execute(
         select(Content)
-        .where(Content.status == ContentStatus.SCHEDULED)
+        .where(
+            Content.status == ContentStatus.SCHEDULED,
+            Content.author_id == current_user.id,
+        )
         .order_by(Content.scheduled_at.asc())
     )
     contents = result.scalars().all()
@@ -60,10 +68,15 @@ async def list_scheduled(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/drafts-ready")
-async def list_drafts_ready(workspace_id: str = "", db: AsyncSession = Depends(get_db)):
+async def list_drafts_ready(
+    workspace_id: str = "",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """List approved/draft content ready for scheduling."""
     query = select(Content).where(
-        Content.status.in_([ContentStatus.DRAFT, ContentStatus.APPROVED])
+        Content.status.in_([ContentStatus.DRAFT, ContentStatus.APPROVED]),
+        Content.author_id == current_user.id,
     ).order_by(Content.created_at.desc())
     if workspace_id:
         query = query.where(Content.workspace_id == uuid.UUID(workspace_id))

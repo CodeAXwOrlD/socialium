@@ -404,6 +404,55 @@ class AISchedulerService:
 _service = AISchedulerService()
 
 
+async def suggest_optimal_time(
+    workspace_id: str,
+    platform: str = "linkedin",
+) -> datetime | None:
+    """Get AI-suggested optimal posting time for a platform.
+    
+    Uses audience activity analysis and historical data to find the best time.
+    Returns datetime or None if unable to determine.
+    """
+    try:
+        activity_service = AudienceActivityService()
+        
+        # Get optimal times for the platform
+        optimal_times = await activity_service.get_optimal_posting_times(
+            workspace_id=workspace_id,
+            platform=platform,
+        )
+        
+        if not optimal_times or not optimal_times.times:
+            # Fallback: schedule for next business day at 9 AM
+            now = datetime.now(timezone.utc)
+            tomorrow = now + timedelta(days=1)
+            return tomorrow.replace(hour=9, minute=0, second=0, microsecond=0)
+        
+        # Get the best time slot
+        best_slot = optimal_times.times[0]  # Already sorted by score
+        
+        # Calculate the next occurrence of this time
+        now = datetime.now(timezone.utc)
+        suggested_time = now.replace(
+            hour=best_slot.hour,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        
+        # If the time has passed today, schedule for tomorrow
+        if suggested_time <= now:
+            suggested_time += timedelta(days=1)
+        
+        logger.info(f"Suggested optimal time for {platform}: {suggested_time}")
+        return suggested_time
+        
+    except Exception as e:
+        logger.warning(f"Failed to suggest optimal time: {e}")
+        # Fallback: 1 hour from now
+        return datetime.now(timezone.utc) + timedelta(hours=1)
+
+
 async def auto_schedule_content(
     content_id: str,
     workspace_id: str,

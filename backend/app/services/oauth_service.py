@@ -13,15 +13,18 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-def get_linkedin_auth_url(user_id: str) -> str:
+def get_linkedin_auth_url(state: str) -> str:
     """Get LinkedIn OAuth authorization URL."""
     params = {
         "response_type": "code",
         "client_id": settings.linkedin_client_id,
         "redirect_uri": settings.linkedin_redirect_uri,
         "scope": "openid profile w_member_social email",
+        "state": state,
     }
-    return f"https://www.linkedin.com/oauth/v2/authorization?{urllib.parse.urlencode(params)}"
+    url = f"https://www.linkedin.com/oauth/v2/authorization?{urllib.parse.urlencode(params)}"
+    print(f"DEBUG: Generated LinkedIn Auth URL: {url}")
+    return url
 
 
 async def exchange_linkedin_code(code: str, redirect_uri: str) -> dict | None:
@@ -44,29 +47,38 @@ async def exchange_linkedin_code(code: str, redirect_uri: str) -> dict | None:
         tokens = response.json()
         access_token = tokens.get("access_token")
 
-        # Get user profile
+        # Get user profile (try userinfo first, then fallback to v2/me)
         profile_resp = await client.get(
             "https://api.linkedin.com/v2/userinfo",
             headers={"Authorization": f"Bearer {access_token}"},
         )
-        if profile_resp.status_code != 200:
-            return tokens
-
-        profile = profile_resp.json()
-        tokens["platform_user_id"] = profile.get("sub")
-        tokens["platform_username"] = profile.get("name", profile.get("email"))
+        
+        if profile_resp.status_code == 200:
+            profile = profile_resp.json()
+            tokens["platform_user_id"] = profile.get("sub")
+            tokens["platform_username"] = profile.get("name", profile.get("email"))
+        else:
+            # Fallback to v2/me
+            me_resp = await client.get(
+                "https://api.linkedin.com/v2/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            if me_resp.status_code == 200:
+                me = me_resp.json()
+                tokens["platform_user_id"] = me.get("id")
+                tokens["platform_username"] = f"{me.get('localizedFirstName', '')} {me.get('localizedLastName', '')}".strip()
 
         return tokens
 
 
-def get_twitter_auth_url(user_id: str) -> str:
+def get_twitter_auth_url(state: str) -> str:
     """Get Twitter/X OAuth authorization URL."""
     params = {
         "response_type": "code",
         "client_id": settings.twitter_client_id,
         "redirect_uri": f"{settings.frontend_url}/platforms/twitter/callback",
         "scope": "tweet.read tweet.write users.read offline.access",
-        "state": "twitter_placeholder",  # Will be replaced with actual state
+        "state": state,
         "code_challenge": "placeholder",
         "code_challenge_method": "S256",
     }
@@ -92,13 +104,14 @@ async def exchange_twitter_code(code: str, code_verifier: str) -> dict | None:
         return response.json()
 
 
-def get_instagram_auth_url(user_id: str) -> str:
+def get_instagram_auth_url(state: str) -> str:
     """Get Instagram OAuth authorization URL."""
     params = {
         "response_type": "code",
         "client_id": settings.instagram_client_id,
         "redirect_uri": f"{settings.frontend_url}/platforms/instagram/callback",
         "scope": "instagram_basic,instagram_content_publish,pages_show_list",
+        "state": state,
     }
     return f"https://api.instagram.com/oauth/authorize?{urllib.parse.urlencode(params)}"
 

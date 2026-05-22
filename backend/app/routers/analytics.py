@@ -9,6 +9,35 @@ from app.services.analytics_service import get_analytics_summary
 router = APIRouter()
 
 
+@router.get("/overview")
+async def get_analytics_overview(
+    workspace_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get analytics overview for dashboard."""
+    import uuid as uuid_mod
+    from datetime import datetime, timedelta
+
+    # Default to last 30 days
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+
+    # Convert workspace_id to UUID
+    try:
+        workspace_uuid = uuid_mod.UUID(workspace_id)
+    except ValueError:
+        return {"error": "Invalid workspace_id format"}
+
+    data = await get_analytics_summary(
+        db=db,
+        workspace_id=workspace_uuid,
+        platform=None,
+        start_date=start_date.date(),
+        end_date=end_date.date(),
+    )
+    return data
+
+
 @router.get("/")
 async def get_analytics(
     workspace_id: str | None = Query(None),

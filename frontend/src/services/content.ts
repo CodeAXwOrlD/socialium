@@ -47,3 +47,33 @@ export async function scoreContent(contentId: string) {
   const res = await api.post(`/content/${contentId}/score`);
   return res.data;
 }
+
+export async function getOptimalTime(contentId: string, targetAudience: string = "") {
+  const res = await api.post(`/scheduling/${contentId}/optimal-time`, null, {
+    params: { target_audience: targetAudience },
+  });
+  return res.data;
+}
+
+export async function autoScheduleContent(contentId: string, targetAudience: string = "") {
+  const res = await api.post(`/scheduling/${contentId}/auto-schedule`, null, {
+    params: { target_audience: targetAudience },
+  });
+  return res.data;
+}
+
+export async function bulkAutoSchedule(workspaceId: string, contentIds: string[], targetAudience: string = "") {
+  const res = await api.post("/scheduling/bulk-auto-schedule", {
+    workspace_id: workspaceId,
+    content_ids: contentIds,
+    target_audience: targetAudience,
+  });
+  return res.data;
+}
+
+export async function scheduleContentManually(contentId: string, scheduledAt: string) {
+  const res = await api.post(`/scheduling/${contentId}/schedule`, null, {
+    params: { scheduled_at: scheduledAt },
+  });
+  return res.data;
+}

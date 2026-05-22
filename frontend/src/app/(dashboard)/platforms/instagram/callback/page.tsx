@@ -37,7 +37,7 @@ function InstagramCallbackContent() {
         {status === "loading" && (
           <>
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
-            <p className="mt-4 text-gray-600">Connecting Instagram...</p>
+            <p className="mt-4" style={{ color: "var(--text-secondary)" }}>Connecting Instagram...</p>
           </>
         )}
         {status === "success" && (

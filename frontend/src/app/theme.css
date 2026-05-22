@@ -1,0 +1,85 @@
+/* Theme Variables */
+:root {
+  /* Light theme (default when .light class is applied) */
+  --bg-primary: #f9fafb;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f3f4f6;
+  
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --text-white: #ffffff;
+  
+  --border-color: #e5e7eb;
+  --border-light: #f3f4f6;
+  
+  --overlay-bg: rgba(0, 0, 0, 0.05);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+:root.dark {
+  /* Dark theme */
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #111118;
+  --bg-card: rgba(255, 255, 255, 0.02);
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-white: #ffffff;
+  
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-light: rgba(255, 255, 255, 0.05);
+  
+  --overlay-bg: rgba(255, 255, 255, 0.02);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Apply theme variables to body */
+html {
+  background-color: var(--bg-primary);
+}
+
+html.light body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+html.dark body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Common component styles */
+.theme-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 6px var(--shadow-color);
+}
+
+.theme-card-hover:hover {
+  background: var(--bg-hover);
+}
+
+.theme-text-primary {
+  color: var(--text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+
+.theme-text-muted {
+  color: var(--text-muted);
+}
+
+.theme-border {
+  border-color: var(--border-color);
+}
+
+/* Transitions */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}

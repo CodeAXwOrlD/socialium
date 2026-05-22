@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: socialium-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: socialium
+      POSTGRES_USER: socialium_user
+      POSTGRES_PASSWORD: socialium_pass_2025
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - socialium-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socialium_user -d socialium"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: socialium-cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - socialium-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:v1.8.4
+    container_name: socialium-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - socialium-network
+    environment:
+      - QDRANT_ALLOW_RECOVERY_MODE=true
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: socialium-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=Socialium
+      - APP_ENV=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://socialium_user:socialium_pass_2025@postgres:5432/socialium
+      - DATABASE_ECHO=false
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - FRONTEND_URL=http://localhost:3000
+      - API_V1_PREFIX=/api/v1
+      # Copy these from your .env file
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_VERIFY_SERVICE_SID=${TWILIO_VERIFY_SERVICE_SID}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+      - WAPIHUB_API_KEY=${WAPIHUB_API_KEY}
+      - WAPIHUB_URL=${WAPIHUB_URL}
+      - WAPIHUB_WEBHOOK_SECRET=${WAPIHUB_WEBHOOK_SECRET}
+      - WAPIHUB_PHONE_NUMBER_ID=${WAPIHUB_PHONE_NUMBER_ID}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL}
+      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - POSTHOG_HOST=${POSTHOG_HOST}
+      - POSTHOG_PROJECT_ID=${POSTHOG_PROJECT_ID}
+      - SECRET_KEY=${SECRET_KEY:-socialium-dev-secret-key-2025-change-in-prod}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-socialium-jwt-secret-key-2025-change-in-production}
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-socialium-encryption-key-32bytes!!}
+    volumes:
+      - ./backend:/app
+      - /app/venv  # Don't mount venv from host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    networks:
+      - socialium-network
+    command: >
+      sh -c "pip install -r requirements.txt &&
+             uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: socialium-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
+      - NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Don't mount node_modules from host
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - socialium-network
+    command: sh -c "npm install && npm run dev"
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+
+networks:
+  socialium-network:
+    driver: bridge

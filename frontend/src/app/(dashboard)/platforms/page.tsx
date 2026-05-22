@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { Plug, ExternalLink, Trash2 } from "lucide-react";
-import { listPlatformAccounts, disconnectPlatform, getOAuthUrl } from "@/services/platforms";
+import { useSearchParams } from "next/navigation";
+import { listPlatformAccounts, disconnectPlatform, getOAuthUrl, handleOAuthCallback } from "@/services/platforms";
 import type { PlatformAccount, Platform } from "@/types";
 import { capitalize, formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -14,12 +15,45 @@ const PLATFORMS: { id: Platform; label: string; color: string }[] = [
   { id: "facebook", label: "Facebook", color: "bg-blue-700" },
 ];
 
-export default function PlatformsPage() {
+function PlatformsContent() {
   const [accounts, setAccounts] = useState<PlatformAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     async function load() {
+      // Check for OAuth callback parameters
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
+      const linkedinSuccess = searchParams.get("linkedin");
+      const error = searchParams.get("error");
+
+      // Check for OAuth error
+      if (error) {
+        toast.error(`OAuth error: ${error}`);
+        window.history.replaceState({}, "", "/platforms");
+        return;
+      }
+
+      // Check if backend already handled the OAuth (redirect with linkedin=success)
+      if (linkedinSuccess === "success") {
+        toast.success("LinkedIn connected successfully!");
+        window.history.replaceState({}, "", "/platforms");
+      }
+      // Otherwise, try to handle OAuth callback (for platforms that use POST)
+      else if (code && state) {
+        try {
+          toast.loading("Connecting account...", { id: "oauth" });
+          await handleOAuthCallback("linkedin", code, state);
+          toast.success("LinkedIn connected!", { id: "oauth" });
+          window.history.replaceState({}, "", "/platforms");
+        } catch (err: any) {
+          const errorMsg = err?.response?.data?.detail || "Failed to connect LinkedIn";
+          toast.error(errorMsg, { id: "oauth" });
+          console.error("OAuth callback error:", err);
+        }
+      }
+
       try {
         const data = await listPlatformAccounts();
         setAccounts(data);
@@ -30,7 +64,7 @@ export default function PlatformsPage() {
       }
     }
     load();
-  }, []);
+  }, [searchParams]);
 
   const handleConnect = async (platform: Platform) => {
     try {
@@ -133,5 +167,13 @@ export default function PlatformsPage() {
         })}
       </div>
     </div>
+  );
+}
+
+export default function NewPlatformsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20">Loading...</div>}>
+      <PlatformsContent />
+    </Suspense>
   );
 }

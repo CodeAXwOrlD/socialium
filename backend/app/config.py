@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     wapihub_api_key: str = ""
     wapihub_url: str = "https://app.whapihub.com/api/v2/whatsapp-business"
     wapihub_webhook_secret: str = ""
+    wapihub_phone_number_id: str = ""
+
+    # Twilio
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""
+    twilio_whatsapp_number: str = ""
+    twilio_verify_service_sid: str = ""  # For OTP verification
 
     # Qdrant
     qdrant_url: str = "http://localhost:6333"
@@ -76,6 +84,9 @@ class Settings(BaseSettings):
     posthog_host: str = "https://us.i.posthog.com"
     posthog_project_id: str = ""
     posthog_personal_api_key: str = ""
+
+    # Sentry
+    sentry_dsn: str = ""
 
     # Celery / APScheduler
     celery_broker_url: str = "redis://localhost:6379/1"

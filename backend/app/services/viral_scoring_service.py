@@ -15,6 +15,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
+
 from app.config import get_settings
 from app.core.qdrant_client import search as qdrant_search
 from app.core.langfuse_setup import get_openai_client, observe
@@ -268,12 +270,13 @@ class ViralScoringService:
 
     @observe(name="viral-hook-scoring")
     async def _score_hook(self, content: str) -> int:
-        """Use GPT-4o-mini to rate the opening hook (0-20)."""
+        """Use GPT-4o-mini to rate the opening hook (0-20). Falls back to Groq if OpenAI unavailable."""
         first_line = content.split("\n")[0][:150]
 
         if not first_line.strip():
             return 5
 
+        # Try OpenAI first
         try:
             client = get_openai_client()
             response = await client.chat.completions.create(
@@ -299,9 +302,14 @@ class ViralScoringService:
             score = int(response.choices[0].message.content.strip())
             return max(0, min(score, 20))
         except Exception as e:
-            logger.warning(f"Hook scoring failed, using heuristic: {e}")
-            # Fallback: heuristic scoring
-            return self._heuristic_hook_score(first_line)
+            logger.warning(f"OpenAI hook scoring failed: {e}. Trying Groq...")
+            
+            # Fallback to Groq
+            try:
+                return await self._score_hook_with_groq(first_line)
+            except Exception as groq_error:
+                logger.warning(f"Groq hook scoring also failed: {groq_error}. Using heuristic.")
+                return self._heuristic_hook_score(first_line)
 
     def _heuristic_hook_score(self, hook: str) -> int:
         """Fallback hook scoring without AI."""
@@ -321,6 +329,54 @@ class ViralScoringService:
         if any(pw in hook_lower for pw in power_words):
             score += 3
         return min(score, 20)
+    
+    async def _score_hook_with_groq(self, hook: str) -> int:
+        """Use Groq LLaMA to rate the hook when OpenAI is unavailable."""
+        try:
+            groq_api_key = settings.groq_api_key
+            if not groq_api_key:
+                raise ValueError("Groq API key not configured")
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {groq_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "llama-3.1-8b-instant",
+                        "messages": [{
+                            "role": "user",
+                            "content": (
+                                f"Rate this social media hook from 0-20.\n\n"
+                                f"Hook: \"{hook}\"\n\n"
+                                f"Scoring criteria:\n"
+                                f"- 18-20: Creates immediate curiosity or strong emotion\n"
+                                f"- 14-17: Good hook, interesting\n"
+                                f"- 10-13: Decent hook\n"
+                                f"- 5-9: Weak hook\n"
+                                f"- 0-4: No hook\n\n"
+                                f"Return ONLY the integer score, nothing else."
+                            ),
+                        }],
+                        "temperature": 0.1,
+                        "max_tokens": 5,
+                    },
+                    timeout=10.0,
+                )
+                
+                if response.status_code != 200:
+                    raise Exception(f"Groq API error: {response.status_code}")
+                
+                result = response.json()
+                score_text = result["choices"][0]["message"]["content"].strip()
+                score = int(score_text)
+                logger.info(f"Groq hook score: {score}/20")
+                return max(0, min(score, 20))
+        except Exception as e:
+            logger.error(f"Groq hook scoring failed: {e}")
+            raise
 
     # ── Factor 2: Emotional Triggers ───────────────────────────────────────────
 

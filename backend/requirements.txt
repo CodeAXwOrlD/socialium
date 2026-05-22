@@ -10,6 +10,7 @@ redis[hiredis]>=5.0.0
 httpx>=0.28.0
 python-jose[cryptography]>=3.3.0
 cryptography>=43.0.0
+email-validator>=2.0.0
 
 # AI / LLM
 openai>=1.60.0
@@ -34,3 +35,4 @@ stripe>=11.0.0
 
 # WhatsApp
 # wapihub — used via REST API (httpx)
+twilio>=9.0.0

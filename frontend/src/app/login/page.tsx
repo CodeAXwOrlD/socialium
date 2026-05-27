@@ -265,7 +265,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-black outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                   placeholder="you@example.com"
                 />
               </div>
@@ -278,7 +278,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-black outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                   placeholder="••••••••"
                 />
               </div>
@@ -315,7 +315,7 @@ export default function LoginPage() {
                     required
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-black outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                     placeholder="+1234567890"
                   />
                   <p className="mt-1 text-xs text-gray-500">
@@ -342,7 +342,7 @@ export default function LoginPage() {
                     required
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-black outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                     placeholder="123456"
                     maxLength={6}
                   />

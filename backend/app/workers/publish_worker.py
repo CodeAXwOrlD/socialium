@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.config import get_settings
 from app.database import async_session_factory
@@ -74,7 +74,7 @@ async def churn_detection() -> None:
             from app.models.content import Content
 
             # Find users inactive for 14+ days
-            cutoff = datetime.now(timezone.utc) - datetime.timedelta(days=14)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=14)
             result = await db.execute(
                 select(User).where(User.is_active == True)
             )

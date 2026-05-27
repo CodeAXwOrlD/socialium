@@ -286,6 +286,7 @@ async def approve_content(
             optimal_time = await suggest_optimal_time(
                 workspace_id=str(content.workspace_id),
                 platform=content.platform.value if content.platform else "linkedin",
+                db=db,
             )
             
             if optimal_time:

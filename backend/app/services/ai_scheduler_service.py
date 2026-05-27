@@ -407,6 +407,7 @@ _service = AISchedulerService()
 async def suggest_optimal_time(
     workspace_id: str,
     platform: str = "linkedin",
+    db: AsyncSession | None = None,
 ) -> datetime | None:
     """Get AI-suggested optimal posting time for a platform.
     
@@ -416,20 +417,33 @@ async def suggest_optimal_time(
     try:
         activity_service = AudienceActivityService()
         
-        # Get optimal times for the platform
-        optimal_times = await activity_service.get_optimal_posting_times(
-            workspace_id=workspace_id,
-            platform=platform,
-        )
+        if db is not None:
+            optimal_times = await activity_service.get_optimal_posting_times(
+                workspace_id=workspace_id,
+                platform=platform,
+                target_audience="",
+                viral_score=50,
+                db=db,
+            )
+        else:
+            benchmarks = activity_service._get_platform_benchmarks(platform, "")
+            best = benchmarks[0] if benchmarks else TimeSlot(day_of_week=1, hour=9)
+            best.scheduled_at = activity_service._next_occurrence(best.day_of_week, best.hour)
+            optimal_times = OptimalTimeResult(
+                best_slot=best,
+                alternative_slots=benchmarks[1:4],
+                confidence=0.3,
+                reasoning="Based on industry benchmarks.",
+            )
         
-        if not optimal_times or not optimal_times.times:
+        if not optimal_times or not optimal_times.best_slot:
             # Fallback: schedule for next business day at 9 AM
             now = datetime.now(timezone.utc)
             tomorrow = now + timedelta(days=1)
             return tomorrow.replace(hour=9, minute=0, second=0, microsecond=0)
         
         # Get the best time slot
-        best_slot = optimal_times.times[0]  # Already sorted by score
+        best_slot = optimal_times.best_slot
         
         # Calculate the next occurrence of this time
         now = datetime.now(timezone.utc)

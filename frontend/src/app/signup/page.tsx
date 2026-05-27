@@ -86,7 +86,7 @@ export default function SignupPage() {
                 minLength={3}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-black outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="johndoe"
               />
             </div>
@@ -96,7 +96,7 @@ export default function SignupPage() {
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-black outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="John Doe"
               />
             </div>
@@ -107,7 +107,7 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-black outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="you@example.com"
               />
             </div>
@@ -119,7 +119,7 @@ export default function SignupPage() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-black outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 placeholder="Min 8 characters"
               />
             </div>

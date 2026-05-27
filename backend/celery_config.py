@@ -3,7 +3,7 @@
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
-from apscheduler.executors.pool import ThreadPoolExecutor
+from apscheduler.executors.asyncio import AsyncIOExecutor
 
 from app.config import get_settings
 
@@ -34,8 +34,8 @@ def start_scheduler() -> None:
             logger.warning(f"Redis job store setup failed, using memory: {e}")
 
     executors = {
-        "default": ThreadPoolExecutor(4),
-        "publish": ThreadPoolExecutor(2),
+        "default": AsyncIOExecutor(),
+        "publish": AsyncIOExecutor(),
     }
 
     job_defaults = {

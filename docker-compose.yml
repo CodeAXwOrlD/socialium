@@ -36,7 +36,7 @@ services:
 
   # Qdrant Vector Database
   qdrant:
-    image: docker.io/qdrant/qdrant:v1.8.4
+    image: docker.io/qdrant/qdrant:latest
     container_name: socialium-qdrant
     restart: unless-stopped
     network_mode: host

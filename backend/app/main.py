@@ -53,6 +53,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
 
+    # ── Database Initialization ──
+    from app.database import Base, engine
+    # Import all models so they register on Base.metadata
+    from app.models.user import User
+    from app.models.workspace import Workspace
+    from app.models.workspace_member import WorkspaceMember
+    from app.models.content import Content
+    from app.models.platform_account import PlatformAccount
+    from app.models.approval import Approval
+    from app.models.ab_test import ABTest
+    from app.models.analytics import AnalyticsEvent
+    from app.models.audience_activity import AudienceActivitySnapshot
+    from app.models.notification import Notification
+    from app.models.trend import Trend
+    from app.models.viral_score import ViralScore
+
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("Database tables verified/created successfully.")
+    except Exception as e:
+        print(f"Error during database initialization: {e}")
+
     # ── Qdrant collection setup ──
     try:
         create_all_collections()

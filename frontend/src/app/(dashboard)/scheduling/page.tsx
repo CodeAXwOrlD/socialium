@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Calendar, Clock, Zap, RefreshCw, CheckCircle, BarChart3 } from "lucide-react";
-import { listContent, autoScheduleContent, getOptimalTime, bulkAutoSchedule } from "@/services/content";
+import { listContent, autoScheduleContent, getOptimalTime, bulkAutoSchedule, scheduleContentManually } from "@/services/content";
 import { requireWorkspaceId, fetchAndStoreWorkspace } from "@/lib/workspace";
 import type { Content } from "@/types";
 import { capitalize } from "@/lib/utils";
@@ -142,6 +142,36 @@ export default function SchedulingPage() {
     } finally {
       setScheduling(null);
     }
+  };
+
+  const executeSchedule = async (scheduledAt: string) => {
+    if (!selectedContent || scheduling) return;
+    
+    setScheduling(selectedContent.id);
+    try {
+      await scheduleContentManually(selectedContent.id, scheduledAt);
+      toast.success("✅ Content scheduled successfully!");
+      setTimeout(() => {
+        loadContent();
+        setSelectedContent(null);
+        setViralScore(null);
+        setOptimalTime(null);
+      }, 2000);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Failed to schedule");
+    } finally {
+      setScheduling(null);
+    }
+  };
+
+  const handleConfirmSchedule = () => {
+    if (optimalTime?.best_slot?.scheduled_at) {
+      executeSchedule(optimalTime.best_slot.scheduled_at);
+    }
+  };
+
+  const handleScheduleAtTime = (scheduledAt: string) => {
+    executeSchedule(scheduledAt);
   };
 
   const handleBulkSchedule = async () => {
@@ -313,7 +343,16 @@ export default function SchedulingPage() {
                       <p className="text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Alternative Times:</p>
                       <div className="space-y-2">
                         {optimalTime.alternative_slots.slice(0, 2).map((slot, i) => (
-                          <div key={i} className="flex justify-between p-3 rounded-lg" style={{ background: "var(--bg-hover)" }}>
+                          <div 
+                            key={i} 
+                            onClick={() => !scheduling && handleScheduleAtTime(slot.scheduled_at)}
+                            className={`flex justify-between p-3 rounded-lg border transition-all ${
+                              scheduling 
+                                ? "opacity-50 cursor-not-allowed border-transparent" 
+                                : "cursor-pointer hover:bg-indigo-600/10 border-transparent hover:border-indigo-500/20 active:scale-[0.99]"
+                            }`}
+                            style={{ background: "var(--bg-hover)" }}
+                          >
                             <span style={{ color: "var(--text-primary)" }}>{formatTimeSlot(slot.day_of_week, slot.hour)}</span>
                             <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Score: {slot.score.toFixed(1)}</span>
                           </div>
@@ -325,9 +364,9 @@ export default function SchedulingPage() {
 
                 {/* Action */}
                 <button
-                  onClick={() => handleAutoSchedule(selectedContent)}
-                  disabled={scheduling === selectedContent.id}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                  onClick={handleConfirmSchedule}
+                  disabled={!!scheduling}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-all"
                 >
                   {scheduling === selectedContent.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                   {scheduling === selectedContent.id ? "Scheduling..." : "Confirm & Schedule"}

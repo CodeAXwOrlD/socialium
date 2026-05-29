@@ -173,14 +173,37 @@ socialium/
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### Clone the Repository
+
+```bash
+git clone https://github.com/your-username/socialium.git
+cd socialium
+```
+
+### Option 1: Run with Docker (Recommended)
+
+The easiest way to run the entire stack (PostgreSQL, Redis, Qdrant, Backend, Frontend) is using Docker.
+
+```bash
+# Make sure Docker is running, then execute:
+./docker-start.sh
+
+# Or using docker compose directly:
+docker compose up -d --build
+```
+
+Access the application at `http://localhost:3000` and the API at `http://localhost:8000/docs`. For more details, see [DOCKER.md](./DOCKER.md).
+
+### Option 2: Manual Setup
+
+#### Prerequisites
 - Python 3.11+
 - Node.js 20+
 - PostgreSQL (or Supabase project)
 - Redis (optional for caching)
 - Qdrant (optional for vector search)
 
-### Backend Setup
+#### Backend Setup (Terminal 1)
 
 ```bash
 cd backend
@@ -196,12 +219,13 @@ cp .env.example .env
 python migrate_collections.py
 
 # Start the server
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend Setup
+#### Frontend Setup (Terminal 2)
 
 ```bash
+# Open a new terminal from the project root
 cd frontend
 npm install
 

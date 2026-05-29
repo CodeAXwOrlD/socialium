@@ -3,19 +3,16 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: docker.io/library/postgres:15-alpine
     container_name: socialium-db
     restart: unless-stopped
-    ports:
-      - "5432:5432"
+    network_mode: host
     environment:
       POSTGRES_DB: socialium
       POSTGRES_USER: socialium_user
       POSTGRES_PASSWORD: socialium_pass_2025
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - socialium-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U socialium_user -d socialium"]
       interval: 10s
@@ -24,15 +21,12 @@ services:
 
   # Redis Cache
   redis:
-    image: redis:7-alpine
+    image: docker.io/library/redis:7-alpine
     container_name: socialium-cache
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    network_mode: host
     volumes:
       - redis_data:/data
-    networks:
-      - socialium-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -42,16 +36,12 @@ services:
 
   # Qdrant Vector Database
   qdrant:
-    image: qdrant/qdrant:v1.8.4
+    image: docker.io/qdrant/qdrant:v1.8.4
     container_name: socialium-qdrant
     restart: unless-stopped
-    ports:
-      - "6333:6333"
-      - "6334:6334"
+    network_mode: host
     volumes:
       - qdrant_data:/qdrant/storage
-    networks:
-      - socialium-network
     environment:
       - QDRANT_ALLOW_RECOVERY_MODE=true
 
@@ -62,16 +52,15 @@ services:
       dockerfile: Dockerfile
     container_name: socialium-backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    network_mode: host
     environment:
       - APP_NAME=Socialium
       - APP_ENV=development
       - DEBUG=true
-      - DATABASE_URL=postgresql+asyncpg://socialium_user:socialium_pass_2025@postgres:5432/socialium
+      - DATABASE_URL=postgresql+asyncpg://socialium_user:socialium_pass_2025@127.0.0.1:5432/socialium
       - DATABASE_ECHO=false
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_URL=http://qdrant:6333
+      - REDIS_URL=redis://127.0.0.1:6379/0
+      - QDRANT_URL=http://127.0.0.1:6333
       - FRONTEND_URL=http://localhost:3000
       - API_V1_PREFIX=/api/v1
       # Copy these from your .env file
@@ -104,15 +93,6 @@ services:
     volumes:
       - ./backend:/app
       - /app/venv  # Don't mount venv from host
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-    networks:
-      - socialium-network
     command: >
       sh -c "pip install -r requirements.txt &&
              uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
@@ -124,8 +104,7 @@ services:
       dockerfile: Dockerfile
     container_name: socialium-frontend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    network_mode: host
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
@@ -134,17 +113,9 @@ services:
       - ./frontend:/app
       - /app/node_modules  # Don't mount node_modules from host
       - /app/.next
-    depends_on:
-      - backend
-    networks:
-      - socialium-network
     command: sh -c "npm install && npm run dev"
 
 volumes:
   postgres_data:
   redis_data:
   qdrant_data:
-
-networks:
-  socialium-network:
-    driver: bridge

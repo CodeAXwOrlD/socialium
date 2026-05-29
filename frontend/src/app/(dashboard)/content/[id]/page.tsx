@@ -9,11 +9,14 @@ import type { Content } from "@/types";
 import { formatDate, capitalize } from "@/lib/utils";
 import toast from "react-hot-toast";
 
+import { useUIStore } from "@/store/use-ui-store";
+
 export default function ContentDetailPage() {
   const router = useRouter();
   const params = useParams();
   const workspaceId = requireWorkspaceId();
   const contentId = params.id as string;
+  const { confirm } = useUIStore();
   
   const [content, setContent] = useState<Content | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +59,8 @@ export default function ContentDetailPage() {
   };
 
   const handleSubmitForApproval = async () => {
-    if (!confirm("Submit this content for approval?")) return;
+    const confirmed = await confirm("Submit this content for approval?");
+    if (!confirmed) return;
     
     setSubmitting(true);
     try {
@@ -79,7 +83,8 @@ export default function ContentDetailPage() {
   };
 
   const handleAutoSchedule = async () => {
-    if (!confirm("AI will analyze your content and automatically schedule it at the optimal time. Continue?")) return;
+    const confirmed = await confirm("AI will analyze your content and automatically schedule it at the optimal time. Continue?");
+    if (!confirmed) return;
     
     setAutoScheduling(true);
     try {
@@ -103,7 +108,8 @@ export default function ContentDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this content?")) return;
+    const confirmed = await confirm("Delete this content?");
+    if (!confirmed) return;
     try {
       await deleteContent(contentId);
       toast.success("Content deleted");

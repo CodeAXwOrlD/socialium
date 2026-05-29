@@ -9,9 +9,11 @@ import { formatDate, capitalize } from "@/lib/utils";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
 import Link from "next/link";
+import { useUIStore } from "@/store/use-ui-store";
 
 export default function ContentPage() {
   const workspaceId = requireWorkspaceId();
+  const { confirm } = useUIStore();
   const [contents, setContents] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -36,7 +38,8 @@ export default function ContentPage() {
   }, [statusFilter, workspaceId]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this content?")) return;
+    const confirmed = await confirm("Delete this content?");
+    if (!confirmed) return;
     try {
       await deleteContent(id);
       setContents((prev) => prev.filter((c) => c.id !== id));
@@ -69,7 +72,8 @@ export default function ContentPage() {
   };
 
   const handlePublishNow = async (id: string) => {
-    if (!confirm("Publish this post right now?")) return;
+    const confirmed = await confirm("Publish this post right now?");
+    if (!confirmed) return;
     
     setPublishing(id);
     try {

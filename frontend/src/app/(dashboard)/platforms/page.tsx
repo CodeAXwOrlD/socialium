@@ -8,6 +8,7 @@ import { getStoredUser } from "@/lib/auth";
 import type { PlatformAccount, Platform } from "@/types";
 import { capitalize, formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { useUIStore } from "@/store/use-ui-store";
 
 const PLATFORMS: { id: Platform; label: string; color: string }[] = [
   { id: "linkedin", label: "LinkedIn", color: "bg-blue-600" },
@@ -83,8 +84,11 @@ function PlatformsContent() {
     }
   };
 
+  const { confirm } = useUIStore();
+
   const handleDisconnect = async (accountId: string) => {
-    if (!confirm("Disconnect this platform?")) return;
+    const confirmed = await confirm("Disconnect this platform?");
+    if (!confirmed) return;
     try {
       await disconnectPlatform(accountId);
       setAccounts((prev) => prev.filter((a) => a.id !== accountId));

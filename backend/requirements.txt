@@ -23,6 +23,8 @@ qdrant-client>=1.12.0
 
 # Observability
 langfuse>=2.50.0
+structlog>=25.5.0
+sentry-sdk>=2.60.0
 
 # Analytics
 posthog>=3.7.0

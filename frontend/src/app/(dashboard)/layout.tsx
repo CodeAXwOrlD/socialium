@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import ConfirmModal from "@/components/ConfirmModal";
 import { isAuthenticated } from "@/lib/auth";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -79,6 +80,8 @@ export default function DashboardLayout({
           />
         )}
       </AnimatePresence>
+
+      <ConfirmModal />
 
       <Sidebar 
         collapsed={isMobile ? false : collapsed} 

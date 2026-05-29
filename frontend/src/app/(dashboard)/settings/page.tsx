@@ -6,6 +6,7 @@ import { getUserProfile, updateUserProfile, updateNotificationSettings, updateAI
 import { getStoredUser } from "@/lib/auth";
 import { logout } from "@/lib/auth";
 import toast from "react-hot-toast";
+import { useUIStore } from "@/store/use-ui-store";
 
 export default function NewSettingsPage() {
   const [mounted, setMounted] = useState(false);
@@ -105,14 +106,14 @@ export default function NewSettingsPage() {
     }
   };
 
+  const { confirm } = useUIStore();
+
   const handleDeleteAccount = async () => {
-    if (!confirm("Are you sure? This will permanently delete your account and all data.")) {
-      return;
-    }
+    const confirmed1 = await confirm("Are you sure? This will permanently delete your account and all data.");
+    if (!confirmed1) return;
     
-    if (!confirm("This action CANNOT be undone. Type 'DELETE' to confirm.")) {
-      return;
-    }
+    const confirmed2 = await confirm("This action CANNOT be undone. Type 'DELETE' to confirm.");
+    if (!confirmed2) return;
     
     try {
       await deleteAccount();

@@ -7,7 +7,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.core.supabase import supabase_sign_up, supabase_sign_in, supabase_refresh_token, supabase_exchange_code_for_token
+from app.core.auth import get_current_user
+from app.core.supabase import (
+    supabase_sign_up,
+    supabase_sign_in,
+    supabase_refresh_token,
+    supabase_exchange_code_for_token,
+    supabase_recover_password,
+    supabase_update_password,
+)
 from app.models.user import User
 from app.schemas.auth import (
     SignUpRequest,
@@ -18,6 +26,8 @@ from app.schemas.auth import (
     GoogleAuthRequest,
     PhoneOTPRequest,
     PhoneOTPVerifyRequest,
+    RecoverPasswordRequest,
+    ResetPasswordRequest,
 )
 from app.core.constants import SubscriptionTier
 
@@ -151,6 +161,30 @@ async def refresh(body: TokenRefreshRequest, db: AsyncSession = Depends(get_db))
         refresh_token=result.get("refresh_token", ""),
         expires_in=result.get("expires_in", 3600),
     )
+
+
+@router.post("/auth/recover")
+async def recover_password(body: RecoverPasswordRequest):
+    """Initiate password recovery by sending a reset email to the user."""
+    success = await supabase_recover_password(body.email)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to initiate password recovery. Please verify the email address is correct."
+        )
+    return {"status": "success", "message": "Password recovery email sent."}
+
+
+@router.put("/auth/reset-password")
+async def reset_password(body: ResetPasswordRequest, current_user: User = Depends(get_current_user)):
+    """Reset / update user password using their active recovery session."""
+    success = await supabase_update_password(str(current_user.id), body.password)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to update password. Please try again."
+        )
+    return {"status": "success", "message": "Password updated successfully."}
 
 
 @router.post("/auth/google", response_model=TokenResponse)

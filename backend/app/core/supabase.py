@@ -196,3 +196,49 @@ async def supabase_exchange_code_for_token(code: str, code_verifier: str) -> dic
         if response.status_code == 200:
             return response.json()
         return None
+
+
+async def supabase_recover_password(email: str) -> bool:
+    """Send a password recovery/reset email to the user."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # We pass the redirectTo parameter so they are sent back to the reset-password page
+    redirect_to = f"{settings.frontend_url}/reset-password" if hasattr(settings, 'frontend_url') else "http://localhost:3000/reset-password"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{settings.supabase_url}/auth/v1/recover",
+            headers={
+                "apikey": settings.supabase_anon_key,
+                "Content-Type": "application/json",
+            },
+            json={"email": email},
+            params={"redirectTo": redirect_to}
+        )
+        if response.status_code == 200:
+            logger.info(f"Password recovery email sent successfully to: {email}")
+            return True
+        else:
+            logger.error(f"Supabase recover password failed for {email}: {response.status_code} - {response.text}")
+            return False
+
+
+async def supabase_update_password(user_id: str, new_password: str) -> bool:
+    """Update a user's password using the admin API."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    headers = get_supabase_headers()
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            f"{settings.supabase_url}/auth/v1/admin/users/{user_id}",
+            headers=headers,
+            json={"password": new_password},
+        )
+        if response.status_code == 200:
+            logger.info(f"Password updated successfully for user ID: {user_id}")
+            return True
+        else:
+            logger.error(f"Supabase password update failed for user {user_id}: {response.status_code} - {response.text}")
+            return False

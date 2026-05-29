@@ -56,3 +56,11 @@ class PhoneOTPRequest(BaseModel):
 class PhoneOTPVerifyRequest(BaseModel):
     phone_number: str
     otp: str
+
+
+class RecoverPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    password: str = Field(min_length=6, max_length=128)

@@ -23,13 +23,20 @@ class Content(Base):
     author_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id"), nullable=False
     )
-    platform: Mapped[Platform | None] = mapped_column(Enum(Platform))
-    status: Mapped[ContentStatus] = mapped_column(
-        Enum(ContentStatus), default=ContentStatus.DRAFT, index=True
+    platform: Mapped[Platform | None] = mapped_column(
+        Enum(Platform, name="platform_enum", values_callable=lambda x: [e.value for e in x])
     )
-    tone: Mapped[ContentTone | None] = mapped_column(Enum(ContentTone))
+    status: Mapped[ContentStatus] = mapped_column(
+        Enum(ContentStatus, name="content_status", values_callable=lambda x: [e.value for e in x]),
+        default=ContentStatus.DRAFT,
+        index=True
+    )
+    tone: Mapped[ContentTone | None] = mapped_column(
+        Enum(ContentTone, name="content_tone", values_callable=lambda x: [e.value for e in x])
+    )
     source_type: Mapped[SourceType] = mapped_column(
-        Enum(SourceType), default=SourceType.MANUAL
+        Enum(SourceType, name="source_type", values_callable=lambda x: [e.value for e in x]),
+        default=SourceType.MANUAL
     )
     title: Mapped[str | None] = mapped_column(String(500))
     body: Mapped[str | None] = mapped_column(Text)
